@@ -1,0 +1,105 @@
+name: Tüm Testler
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Hangi testleri çalıştır?'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - jest-only
+          - pytest-only
+      node_version:
+        description: 'Node.js versiyonu (Jest için)'
+        required: false
+        default: '20'
+        type: choice
+        options:
+          - '20'
+          - '22'
+          - '18'
+      python_version:
+        description: 'Python versiyonu (pytest için)'
+        required: false
+        default: '3.12'
+        type: choice
+        options:
+          - '3.12'
+          - '3.11'
+          - '3.13'
+
+jobs:
+  jest:
+    name: Jest Tests
+    runs-on: ubuntu-latest
+    if: ${{ inputs.suite == 'both' || inputs.suite == 'jest-only' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: 'npm'
+          cache-dependency-path: jest-tests/package-lock.json
+
+      - name: Bağımlılıkları yükle
+        working-directory: jest-tests
+        run: npm ci
+
+      - name: Jest testlerini çalıştır
+        working-directory: jest-tests
+        env:
+          JEST_JUNIT_OUTPUT_DIR: ./reports
+          JEST_JUNIT_OUTPUT_NAME: junit.xml
+          JEST_JUNIT_SUITE_NAME: '{filepath}'
+          JEST_JUNIT_CLASSNAME: '{classname}'
+          JEST_JUNIT_TITLE: '{title}'
+        run: npm test
+
+      - name: Jest raporu yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jest-junit-report
+          path: jest-tests/reports/junit.xml
+          retention-days: 90
+
+  pytest:
+    name: Pytest Tests
+    runs-on: ubuntu-latest
+    if: ${{ inputs.suite == 'both' || inputs.suite == 'pytest-only' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: 'pip'
+          cache-dependency-path: pytest-tests/requirements.txt
+
+      - name: Bağımlılıkları yükle
+        working-directory: pytest-tests
+        run: pip install -r requirements.txt
+
+      - name: Pytest testlerini çalıştır
+        working-directory: pytest-tests
+        run: |
+          pytest tests/ \
+            --junitxml=reports/junit.xml \
+            -v \
+            --tb=short
+
+      - name: Pytest raporu yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-junit-report
+          path: pytest-tests/reports/junit.xml
+          retention-days: 90
