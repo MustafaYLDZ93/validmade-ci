@@ -23,15 +23,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: k6 testlerini çalıştır
-        run: k6 run k6-tests/scripts/api_test.js
+      - name: k6 testlerini sırayla çalıştır
+        run: |
+          OVERALL=0
+          for SCRIPT in k6-tests/scripts/*.js; do
+            NAME=$(basename "$SCRIPT" .js)
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "▶ $NAME"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            k6 run "$SCRIPT" || OVERALL=1
+          done
+          exit $OVERALL
         continue-on-error: true
 
-      - name: k6 raporunu yükle
+      - name: k6 raporlarını yükle
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: k6-report
-          path: k6-summary.json
+          path: '*-summary.json'
           if-no-files-found: warn
           retention-days: 90
