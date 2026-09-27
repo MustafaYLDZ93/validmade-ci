@@ -13,6 +13,7 @@ on:
           - jest-only
           - pytest-only
           - vitest-only
+          - mocha-only
       node_version:
         description: 'Node.js versiyonu (Jest için)'
         required: false
@@ -33,6 +34,37 @@ on:
           - '3.13'
 
 jobs:
+  mocha:
+    name: Mocha Tests
+    runs-on: ubuntu-latest
+    if: ${{ inputs.suite == 'both' || inputs.suite == 'mocha-only' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: 'npm'
+          cache-dependency-path: mocha-tests/package-lock.json
+
+      - name: Bağımlılıkları yükle
+        working-directory: mocha-tests
+        run: npm ci
+
+      - name: Mocha testlerini çalıştır
+        working-directory: mocha-tests
+        run: npm test
+
+      - name: Mocha raporu yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mocha-junit-report
+          path: mocha-tests/reports/junit.xml
+          retention-days: 90
+
   vitest:
     name: Vitest Tests
     runs-on: ubuntu-latest
