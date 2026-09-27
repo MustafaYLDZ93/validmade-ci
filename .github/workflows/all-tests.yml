@@ -219,3 +219,81 @@ jobs:
           name: pytest-junit-report
           path: pytest-tests/reports/junit.xml
           retention-days: 90
+
+  merge-reports:
+    name: Raporları Birleştir
+    runs-on: ubuntu-latest
+    needs: [jest, vitest, mocha, pytest, cypress]
+    if: always()
+
+    steps:
+      - name: Jest raporunu indir
+        uses: actions/download-artifact@v4
+        with:
+          name: jest-junit-report
+          path: reports/jest
+        continue-on-error: true
+
+      - name: Vitest raporunu indir
+        uses: actions/download-artifact@v4
+        with:
+          name: vitest-junit-report
+          path: reports/vitest
+        continue-on-error: true
+
+      - name: Mocha raporunu indir
+        uses: actions/download-artifact@v4
+        with:
+          name: mocha-junit-report
+          path: reports/mocha
+        continue-on-error: true
+
+      - name: Pytest raporunu indir
+        uses: actions/download-artifact@v4
+        with:
+          name: pytest-junit-report
+          path: reports/pytest
+        continue-on-error: true
+
+      - name: Cypress raporunu indir
+        uses: actions/download-artifact@v4
+        with:
+          name: cypress-junit-report
+          path: reports/cypress
+        continue-on-error: true
+
+      - name: XML raporları birleştir
+        run: |
+          python3 - <<'PYEOF'
+          import glob, re
+
+          suites = []
+          for xml_file in sorted(glob.glob('reports/*/junit.xml')):
+              with open(xml_file) as f:
+                  content = f.read()
+              for s in re.findall(r'<testsuite\b[\s\S]*?</testsuite>', content):
+                  # Boş Root Suite'leri atla
+                  if re.search(r'\btests="0"', s) and '<testcase' not in s:
+                      continue
+                  suites.append(s)
+
+          total    = sum(int(m.group(1)) for s in suites for m in [re.search(r'\btests="(\d+)"',    s)] if m)
+          failures = sum(int(m.group(1)) for s in suites for m in [re.search(r'\bfailures="(\d+)"', s)] if m)
+
+          with open('junit-combined.xml', 'w') as f:
+              f.write(f'<?xml version="1.0" encoding="UTF-8"?>\n')
+              f.write(f'<testsuites tests="{total}" failures="{failures}">\n')
+              for s in suites:
+                  f.write(s + '\n')
+              f.write('</testsuites>\n')
+
+          print(f"Birleştirildi: {total} test, {failures} hata, {len(suites)} suite")
+          PYEOF
+
+      - name: Birleşik raporu yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-combined-report
+          path: junit-combined.xml
+          retention-days: 90
