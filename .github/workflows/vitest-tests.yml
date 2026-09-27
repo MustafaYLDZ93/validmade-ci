@@ -1,0 +1,60 @@
+name: Vitest Unit Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'vitest-tests/**'
+      - '.github/workflows/vitest-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'vitest-tests/**'
+  workflow_dispatch:
+    inputs:
+      node_version:
+        description: 'Node.js versiyonu'
+        required: false
+        default: '20'
+        type: choice
+        options:
+          - '20'
+          - '22'
+          - '18'
+      fail_fast:
+        description: 'İlk hata görülünce dur'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  vitest:
+    name: Vitest Tests (Node ${{ inputs.node_version || '20' }})
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version || '20' }}
+          cache: 'npm'
+          cache-dependency-path: vitest-tests/package-lock.json
+
+      - name: Bağımlılıkları yükle
+        working-directory: vitest-tests
+        run: npm ci
+
+      - name: Vitest testlerini çalıştır (JUnit XML)
+        working-directory: vitest-tests
+        run: npm test
+        continue-on-error: ${{ inputs.fail_fast != 'true' }}
+
+      - name: Test raporu artifact olarak yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-junit-report
+          path: vitest-tests/reports/junit.xml
+          retention-days: 90
