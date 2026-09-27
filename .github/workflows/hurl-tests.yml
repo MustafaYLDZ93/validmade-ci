@@ -1,0 +1,50 @@
+name: Hurl API Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'hurl-tests/**'
+      - '.github/workflows/hurl-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'hurl-tests/**'
+  workflow_dispatch:
+
+jobs:
+  hurl:
+    name: Hurl API Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hurl kur
+        run: |
+          LATEST=$(curl -sSfL https://api.github.com/repos/Orange-OpenSource/hurl/releases/latest \
+            | grep '"tag_name"' | cut -d'"' -f4)
+          curl -sSfL \
+            "https://github.com/Orange-OpenSource/hurl/releases/download/${LATEST}/hurl_${LATEST}_amd64.deb" \
+            -o hurl.deb
+          sudo dpkg -i hurl.deb
+
+      - name: Hurl versiyonunu doğrula
+        run: hurl --version
+
+      - name: Hurl testlerini çalıştır
+        run: |
+          hurl --test \
+            --report-html hurl-report \
+            hurl-tests/tests/posts.hurl \
+            hurl-tests/tests/users.hurl \
+            hurl-tests/tests/todos.hurl
+        continue-on-error: true
+
+      - name: Hurl raporunu yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hurl-report
+          path: hurl-report/
+          retention-days: 90

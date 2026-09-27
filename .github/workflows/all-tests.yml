@@ -16,6 +16,8 @@ on:
           - mocha-only
           - cypress-only
           - playwright-only
+          - hurl-only
+          - k6-only
       node_version:
         description: 'Node.js versiyonu (Jest için)'
         required: false
@@ -261,10 +263,74 @@ jobs:
           path: playwright-tests/playwright-report/
           retention-days: 90
 
+  hurl:
+    name: Hurl API Tests
+    runs-on: ubuntu-latest
+    if: ${{ inputs.suite == 'both' || inputs.suite == 'hurl-only' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hurl kur
+        run: |
+          LATEST=$(curl -sSfL https://api.github.com/repos/Orange-OpenSource/hurl/releases/latest \
+            | grep '"tag_name"' | cut -d'"' -f4)
+          curl -sSfL \
+            "https://github.com/Orange-OpenSource/hurl/releases/download/${LATEST}/hurl_${LATEST}_amd64.deb" \
+            -o hurl.deb
+          sudo dpkg -i hurl.deb
+
+      - name: Hurl testlerini çalıştır
+        run: |
+          hurl --test \
+            --report-html hurl-report \
+            hurl-tests/tests/posts.hurl \
+            hurl-tests/tests/users.hurl \
+            hurl-tests/tests/todos.hurl
+        continue-on-error: true
+
+      - name: Hurl raporunu yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hurl-report
+          path: hurl-report/
+          retention-days: 90
+
+  k6:
+    name: k6 Performance Tests
+    runs-on: ubuntu-latest
+    if: ${{ inputs.suite == 'both' || inputs.suite == 'k6-only' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: k6 kur
+        run: |
+          sudo gpg --no-default-keyring \
+            --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 \
+            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update -qq && sudo apt-get install -y k6
+
+      - name: k6 testlerini çalıştır
+        run: k6 run k6-tests/scripts/api_test.js
+        continue-on-error: true
+
+      - name: k6 raporunu yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-report
+          path: k6-summary.json
+          retention-days: 90
+
   merge-reports:
     name: Raporları Birleştir
     runs-on: ubuntu-latest
-    needs: [jest, vitest, mocha, pytest, cypress, playwright]
+    needs: [jest, vitest, mocha, pytest, cypress, playwright, hurl, k6]
     if: always()
 
     steps:
