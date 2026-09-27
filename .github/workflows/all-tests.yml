@@ -15,6 +15,7 @@ on:
           - vitest-only
           - mocha-only
           - cypress-only
+          - playwright-only
       node_version:
         description: 'Node.js versiyonu (Jest için)'
         required: false
@@ -220,10 +221,58 @@ jobs:
           path: pytest-tests/reports/junit.xml
           retention-days: 90
 
+  playwright:
+    name: Playwright Tests
+    runs-on: ubuntu-latest
+    if: ${{ inputs.suite == 'both' || inputs.suite == 'playwright-only' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: 'npm'
+          cache-dependency-path: playwright-tests/package-lock.json
+
+      - name: Bağımlılıkları yükle
+        working-directory: playwright-tests
+        run: npm ci
+
+      - name: Playwright tarayıcılarını kur
+        working-directory: playwright-tests
+        run: npx playwright install chromium --with-deps
+
+      - name: Playwright testlerini çalıştır
+        working-directory: playwright-tests
+        run: |
+          if [ "${{ inputs.failed_tests_only }}" = "true" ]; then
+            npx playwright test --grep "@failed-tests"
+          else
+            npm test
+          fi
+
+      - name: Playwright HTML raporunu yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-tests/playwright-report/
+          retention-days: 90
+
+      - name: Playwright JUnit raporunu yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-junit-report
+          path: playwright-tests/reports/junit.xml
+          retention-days: 90
+
   merge-reports:
     name: Raporları Birleştir
     runs-on: ubuntu-latest
-    needs: [jest, vitest, mocha, pytest, cypress]
+    needs: [jest, vitest, mocha, pytest, cypress, playwright]
     if: always()
 
     steps:
@@ -260,6 +309,13 @@ jobs:
         with:
           name: cypress-junit-report
           path: reports/cypress
+        continue-on-error: true
+
+      - name: Playwright JUnit raporunu indir
+        uses: actions/download-artifact@v4
+        with:
+          name: playwright-junit-report
+          path: reports/playwright
         continue-on-error: true
 
       - name: XML raporları birleştir
