@@ -33,6 +33,11 @@ on:
           - '3.12'
           - '3.11'
           - '3.13'
+      failed_tests_only:
+        description: 'Sadece @failed-tests etiketli testleri çalıştır'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   mocha:
@@ -56,7 +61,12 @@ jobs:
 
       - name: Mocha testlerini çalıştır
         working-directory: mocha-tests
-        run: npm test
+        run: |
+          if [ "${{ inputs.failed_tests_only }}" = "true" ]; then
+            npx mocha 'test/**/*.test.js' --reporter mocha-junit-reporter --reporter-options mochaFile=reports/junit.xml --grep "@failed-tests"
+          else
+            npm test
+          fi
 
       - name: Mocha raporu yükle
         if: always()
@@ -87,7 +97,12 @@ jobs:
 
       - name: Vitest testlerini çalıştır
         working-directory: vitest-tests
-        run: npm test
+        run: |
+          if [ "${{ inputs.failed_tests_only }}" = "true" ]; then
+            npx vitest run --reporter=junit --outputFile=reports/junit.xml -t "@failed-tests"
+          else
+            npm test
+          fi
 
       - name: Vitest raporu yükle
         if: always()
@@ -124,7 +139,12 @@ jobs:
           JEST_JUNIT_SUITE_NAME: '{filepath}'
           JEST_JUNIT_CLASSNAME: '{classname}'
           JEST_JUNIT_TITLE: '{title}'
-        run: npm test
+        run: |
+          if [ "${{ inputs.failed_tests_only }}" = "true" ]; then
+            npm test -- --testNamePattern="@failed-tests"
+          else
+            npm test
+          fi
 
       - name: Jest raporu yükle
         if: always()
@@ -186,10 +206,11 @@ jobs:
       - name: Pytest testlerini çalıştır
         working-directory: pytest-tests
         run: |
-          pytest tests/ \
-            --junitxml=reports/junit.xml \
-            -v \
-            --tb=short
+          if [ "${{ inputs.failed_tests_only }}" = "true" ]; then
+            pytest tests/ --junitxml=reports/junit.xml -v --tb=short -k "failed_tests"
+          else
+            pytest tests/ --junitxml=reports/junit.xml -v --tb=short
+          fi
 
       - name: Pytest raporu yükle
         if: always()
