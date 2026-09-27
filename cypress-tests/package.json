@@ -1,0 +1,11 @@
+{
+  "name": "cypress-tests",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "cypress run --reporter mocha-junit-reporter --reporter-options 'mochaFile=reports/junit.xml,toConsole=false'"
+  },
+  "devDependencies": {
+    "cypress": "^13.15.0",
+    "mocha-junit-reporter": "^2.2.1"
+  }
+}

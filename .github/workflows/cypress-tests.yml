@@ -1,0 +1,66 @@
+name: Cypress E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'cypress-tests/**'
+      - '.github/workflows/cypress-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'cypress-tests/**'
+  workflow_dispatch:
+    inputs:
+      node_version:
+        description: 'Node.js versiyonu'
+        required: false
+        default: '20'
+        type: choice
+        options:
+          - '20'
+          - '22'
+          - '18'
+      browser:
+        description: 'Tarayıcı'
+        required: false
+        default: 'electron'
+        type: choice
+        options:
+          - electron
+          - chrome
+          - firefox
+
+jobs:
+  cypress:
+    name: Cypress Tests (${{ inputs.browser || 'electron' }})
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version || '20' }}
+          cache: 'npm'
+          cache-dependency-path: cypress-tests/package-lock.json
+
+      - name: Bağımlılıkları yükle
+        working-directory: cypress-tests
+        run: npm ci
+
+      - name: Cypress testlerini çalıştır
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: cypress-tests
+          browser: ${{ inputs.browser || 'electron' }}
+          command: npm test
+
+      - name: Test raporu artifact olarak yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-junit-report
+          path: cypress-tests/reports/junit.xml
+          retention-days: 90
