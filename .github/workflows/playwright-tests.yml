@@ -67,10 +67,3 @@ jobs:
           path: playwright-tests/playwright-report/
           retention-days: 90
 
-      - name: Playwright JUnit raporunu yükle
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-junit-report
-          path: playwright-tests/reports/junit.xml
-          retention-days: 90
