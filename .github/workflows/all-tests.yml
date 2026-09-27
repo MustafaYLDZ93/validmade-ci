@@ -12,6 +12,7 @@ on:
           - both
           - jest-only
           - pytest-only
+          - vitest-only
       node_version:
         description: 'Node.js versiyonu (Jest için)'
         required: false
@@ -32,6 +33,37 @@ on:
           - '3.13'
 
 jobs:
+  vitest:
+    name: Vitest Tests
+    runs-on: ubuntu-latest
+    if: ${{ inputs.suite == 'both' || inputs.suite == 'vitest-only' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: 'npm'
+          cache-dependency-path: vitest-tests/package-lock.json
+
+      - name: Bağımlılıkları yükle
+        working-directory: vitest-tests
+        run: npm ci
+
+      - name: Vitest testlerini çalıştır
+        working-directory: vitest-tests
+        run: npm test
+
+      - name: Vitest raporu yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-junit-report
+          path: vitest-tests/reports/junit.xml
+          retention-days: 90
+
   jest:
     name: Jest Tests
     runs-on: ubuntu-latest
