@@ -301,19 +301,12 @@ jobs:
     name: k6 Performance Tests
     runs-on: ubuntu-latest
     if: ${{ inputs.suite == 'both' || inputs.suite == 'k6-only' }}
+    container:
+      image: grafana/k6:latest
+      options: --entrypoint /bin/sh --user root
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: k6 kur
-        run: |
-          sudo gpg --no-default-keyring \
-            --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
-            --keyserver hkp://keyserver.ubuntu.com:80 \
-            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
-          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
-            | sudo tee /etc/apt/sources.list.d/k6.list
-          sudo apt-get update -qq && sudo apt-get install -y k6
 
       - name: k6 testlerini çalıştır
         run: k6 run k6-tests/scripts/api_test.js
@@ -325,6 +318,7 @@ jobs:
         with:
           name: k6-report
           path: k6-summary.json
+          if-no-files-found: warn
           retention-days: 90
 
   merge-reports:
