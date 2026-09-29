@@ -147,7 +147,7 @@ hurl:
     - if: $CI_PIPELINE_SOURCE == "web"
     - if: $CI_PIPELINE_SOURCE == "trigger"
   script:
-    - apt-get update -qq && apt-get install -y -qq curl
+    - apt-get update -qq && apt-get install -y -qq curl libxml2
     - LATEST=$(curl -sSfL https://api.github.com/repos/Orange-OpenSource/hurl/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
     - curl -sSfL "https://github.com/Orange-OpenSource/hurl/releases/download/${LATEST}/hurl_${LATEST}_amd64.deb" -o hurl.deb
     - dpkg -i hurl.deb
