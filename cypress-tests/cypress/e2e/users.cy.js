@@ -39,7 +39,7 @@ describe('Users API', () => {
 });
 
 describe('Hatalı Test (Bilerek)', () => {
-  it('kullanıcı sayısı 5 olmalı (yanlış beklenti)', () => {
+  it.skip('kullanıcı sayısı 5 olmalı (yanlış beklenti)', () => {
     cy.request('GET', '/users').then(res => {
       expect(res.body).to.have.length(5); // aslında 10 kullanıcı var
     });
