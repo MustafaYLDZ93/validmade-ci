@@ -55,7 +55,7 @@ vitest:
     - npm ci
     - |
       if [ "$SKIP_FAILED_TESTS" = "true" ]; then
-        npx vitest run --reporter=junit --outputFile=reports/junit.xml --grep-invert "@failed-tests"
+        npx vitest run --reporter=junit --outputFile=reports/junit.xml -t "^((?!@failed-tests).)*$"
       else
         npm test
       fi
