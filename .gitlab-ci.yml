@@ -5,9 +5,6 @@ stages:
 variables:
   NODE_VERSION: "20"
   PYTHON_VERSION: "3.12"
-  # true → @failed-tests etiketli intentional failure testleri atla (varsayılan)
-  # false → tüm testleri çalıştır (pipeline fail olabilir)
-  SKIP_FAILED_TESTS: "true"
 
 jest:
   stage: test
@@ -27,12 +24,7 @@ jest:
   script:
     - cd jest-tests
     - npm ci
-    - |
-      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
-        npm test -- --testNamePattern="^(?!.*@failed-tests)"
-      else
-        npm test
-      fi
+    - npm test
   artifacts:
     when: always
     expire_in: 90 days
@@ -53,12 +45,7 @@ vitest:
   script:
     - cd vitest-tests
     - npm ci
-    - |
-      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
-        npx vitest run --reporter=junit --outputFile=reports/junit.xml -t "^((?!@failed-tests).)*$"
-      else
-        npm test
-      fi
+    - npm test
   artifacts:
     when: always
     expire_in: 90 days
@@ -79,14 +66,7 @@ mocha:
   script:
     - cd mocha-tests
     - npm ci
-    - |
-      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
-        npx mocha 'test/**/*.test.js' --reporter mocha-junit-reporter \
-          --reporter-options mochaFile=reports/junit.xml \
-          --fgrep "@failed-tests" --invert
-      else
-        npm test
-      fi
+    - npm test
   artifacts:
     when: always
     expire_in: 90 days
@@ -107,12 +87,7 @@ pytest:
   script:
     - cd pytest-tests
     - pip install -r requirements.txt
-    - |
-      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
-        pytest tests/ --junitxml=reports/junit.xml -v --tb=short -k "not failed_tests"
-      else
-        pytest tests/ --junitxml=reports/junit.xml -v --tb=short
-      fi
+    - pytest tests/ --junitxml=reports/junit.xml -v --tb=short
   artifacts:
     when: always
     expire_in: 90 days
@@ -134,12 +109,7 @@ playwright:
     - cd playwright-tests
     - npm ci
     - npx playwright install chromium --with-deps
-    - |
-      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
-        npx playwright test --grep-invert "@failed-tests"
-      else
-        npm test
-      fi
+    - npm test
   artifacts:
     when: always
     expire_in: 90 days
@@ -148,9 +118,7 @@ playwright:
 
 cypress:
   stage: test
-  image: 
-    name: cypress/included:latest
-    entrypoint: [""]
+  image: cypress/included:latest
   rules:
     - changes:
         - cypress-tests/**/*
@@ -160,12 +128,7 @@ cypress:
   script:
     - cd cypress-tests
     - npm ci
-    - |
-      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
-        npx cypress run --env grepInvert=@failed-tests
-      else
-        npm test
-      fi
+    - npm test
   artifacts:
     when: always
     expire_in: 90 days
@@ -184,7 +147,7 @@ hurl:
     - if: $CI_PIPELINE_SOURCE == "web"
     - if: $CI_PIPELINE_SOURCE == "trigger"
   script:
-    - apt-get update -qq && apt-get install -y -qq curl libxml2
+    - apt-get update -qq && apt-get install -y -qq curl
     - LATEST=$(curl -sSfL https://api.github.com/repos/Orange-OpenSource/hurl/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
     - curl -sSfL "https://github.com/Orange-OpenSource/hurl/releases/download/${LATEST}/hurl_${LATEST}_amd64.deb" -o hurl.deb
     - dpkg -i hurl.deb
@@ -197,9 +160,7 @@ hurl:
 
 k6:
   stage: test
-  image: 
-    name: grafana/k6:latest
-    entrypoint: [""]
+  image: grafana/k6:latest
   rules:
     - changes:
         - k6-tests/**/*
