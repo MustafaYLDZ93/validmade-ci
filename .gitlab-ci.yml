@@ -1,0 +1,199 @@
+stages:
+  - test
+  - merge
+
+variables:
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.12"
+
+jest:
+  stage: test
+  image: node:${NODE_VERSION}
+  rules:
+    - changes:
+        - jest-tests/**/*
+        - .gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+  variables:
+    JEST_JUNIT_OUTPUT_DIR: ./reports
+    JEST_JUNIT_OUTPUT_NAME: junit.xml
+    JEST_JUNIT_SUITE_NAME: "{filepath}"
+    JEST_JUNIT_CLASSNAME: "{classname}"
+    JEST_JUNIT_TITLE: "{title}"
+  script:
+    - cd jest-tests
+    - npm ci
+    - npm test
+  artifacts:
+    when: always
+    expire_in: 90 days
+    reports:
+      junit: jest-tests/reports/junit.xml
+    paths:
+      - jest-tests/reports/junit.xml
+
+vitest:
+  stage: test
+  image: node:${NODE_VERSION}
+  rules:
+    - changes:
+        - vitest-tests/**/*
+        - .gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+  script:
+    - cd vitest-tests
+    - npm ci
+    - npm test
+  artifacts:
+    when: always
+    expire_in: 90 days
+    reports:
+      junit: vitest-tests/reports/junit.xml
+    paths:
+      - vitest-tests/reports/junit.xml
+
+mocha:
+  stage: test
+  image: node:${NODE_VERSION}
+  rules:
+    - changes:
+        - mocha-tests/**/*
+        - .gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+  script:
+    - cd mocha-tests
+    - npm ci
+    - npm test
+  artifacts:
+    when: always
+    expire_in: 90 days
+    reports:
+      junit: mocha-tests/reports/junit.xml
+    paths:
+      - mocha-tests/reports/junit.xml
+
+pytest:
+  stage: test
+  image: python:${PYTHON_VERSION}
+  rules:
+    - changes:
+        - pytest-tests/**/*
+        - .gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+  script:
+    - cd pytest-tests
+    - pip install -r requirements.txt
+    - pytest tests/ --junitxml=reports/junit.xml -v --tb=short
+  artifacts:
+    when: always
+    expire_in: 90 days
+    reports:
+      junit: pytest-tests/reports/junit.xml
+    paths:
+      - pytest-tests/reports/junit.xml
+
+playwright:
+  stage: test
+  image: mcr.microsoft.com/playwright:v1.49.0-noble
+  rules:
+    - changes:
+        - playwright-tests/**/*
+        - .gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+  script:
+    - cd playwright-tests
+    - npm ci
+    - npx playwright install chromium --with-deps
+    - npm test
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - playwright-tests/playwright-report/
+
+cypress:
+  stage: test
+  image: cypress/included:latest
+  rules:
+    - changes:
+        - cypress-tests/**/*
+        - .gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+  script:
+    - cd cypress-tests
+    - npm ci
+    - npm test
+  artifacts:
+    when: always
+    expire_in: 90 days
+    reports:
+      junit: cypress-tests/reports/junit.xml
+    paths:
+      - cypress-tests/reports/junit.xml
+
+hurl:
+  stage: test
+  image: ubuntu:24.04
+  rules:
+    - changes:
+        - hurl-tests/**/*
+        - .gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+  script:
+    - apt-get update -qq && apt-get install -y -qq curl
+    - LATEST=$(curl -sSfL https://api.github.com/repos/Orange-OpenSource/hurl/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+    - curl -sSfL "https://github.com/Orange-OpenSource/hurl/releases/download/${LATEST}/hurl_${LATEST}_amd64.deb" -o hurl.deb
+    - dpkg -i hurl.deb
+    - hurl --test --report-html hurl-report hurl-tests/tests/posts.hurl hurl-tests/tests/users.hurl hurl-tests/tests/todos.hurl || true
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - hurl-report/
+
+k6:
+  stage: test
+  image: grafana/k6:latest
+  rules:
+    - changes:
+        - k6-tests/**/*
+        - .gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+  allow_failure: true
+  script:
+    - OVERALL=0
+    - for SCRIPT in k6-tests/scripts/*.js; do k6 run "$SCRIPT" || OVERALL=1; done
+    - exit $OVERALL
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - "*-summary.json"
+
+merge-reports:
+  stage: merge
+  image: python:3.12-slim
+  when: always
+  dependencies:
+    - jest
+    - vitest
+    - mocha
+    - pytest
+    - cypress
+  script:
+    - python3 merge.py
+  artifacts:
+    when: always
+    expire_in: 90 days
+    reports:
+      junit: junit-combined.xml
+    paths:
+      - junit-combined.xml
