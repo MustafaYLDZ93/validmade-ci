@@ -5,6 +5,9 @@ stages:
 variables:
   NODE_VERSION: "20"
   PYTHON_VERSION: "3.12"
+  # true → @failed-tests etiketli intentional failure testleri atla (varsayılan)
+  # false → tüm testleri çalıştır (pipeline fail olabilir)
+  SKIP_FAILED_TESTS: "true"
 
 jest:
   stage: test
@@ -24,7 +27,12 @@ jest:
   script:
     - cd jest-tests
     - npm ci
-    - npm test
+    - |
+      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
+        npm test -- --testNamePattern="^(?!.*@failed-tests)"
+      else
+        npm test
+      fi
   artifacts:
     when: always
     expire_in: 90 days
@@ -45,7 +53,12 @@ vitest:
   script:
     - cd vitest-tests
     - npm ci
-    - npm test
+    - |
+      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
+        npx vitest run --reporter=junit --outputFile=reports/junit.xml --grep-invert "@failed-tests"
+      else
+        npm test
+      fi
   artifacts:
     when: always
     expire_in: 90 days
@@ -66,7 +79,14 @@ mocha:
   script:
     - cd mocha-tests
     - npm ci
-    - npm test
+    - |
+      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
+        npx mocha 'test/**/*.test.js' --reporter mocha-junit-reporter \
+          --reporter-options mochaFile=reports/junit.xml \
+          --fgrep "@failed-tests" --invert
+      else
+        npm test
+      fi
   artifacts:
     when: always
     expire_in: 90 days
@@ -87,7 +107,12 @@ pytest:
   script:
     - cd pytest-tests
     - pip install -r requirements.txt
-    - pytest tests/ --junitxml=reports/junit.xml -v --tb=short
+    - |
+      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
+        pytest tests/ --junitxml=reports/junit.xml -v --tb=short -k "not failed_tests"
+      else
+        pytest tests/ --junitxml=reports/junit.xml -v --tb=short
+      fi
   artifacts:
     when: always
     expire_in: 90 days
@@ -109,7 +134,12 @@ playwright:
     - cd playwright-tests
     - npm ci
     - npx playwright install chromium --with-deps
-    - npm test
+    - |
+      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
+        npx playwright test --grep-invert "@failed-tests"
+      else
+        npm test
+      fi
   artifacts:
     when: always
     expire_in: 90 days
@@ -128,7 +158,12 @@ cypress:
   script:
     - cd cypress-tests
     - npm ci
-    - npm test
+    - |
+      if [ "$SKIP_FAILED_TESTS" = "true" ]; then
+        npx cypress run --env grepInvert=@failed-tests
+      else
+        npm test
+      fi
   artifacts:
     when: always
     expire_in: 90 days
