@@ -148,7 +148,9 @@ playwright:
 
 cypress:
   stage: test
-  image: cypress/included:latest
+  image: 
+    name: cypress/included:latest
+    entrypoint: [""]
   rules:
     - changes:
         - cypress-tests/**/*
