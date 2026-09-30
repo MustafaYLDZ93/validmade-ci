@@ -9,7 +9,7 @@ variables:
   SKIP_FAILED_TESTS: 'true'
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: Default
 
 steps:
   # --- Araclar ---
