@@ -9,12 +9,13 @@ for xml_file in sorted(glob.glob('*-tests/reports/junit.xml')):
             continue
         suites.append(s)
 
-total    = sum(int(m.group(1)) for s in suites for m in [re.search(r'\btests="(\d+)"',    s)] if m)
-failures = sum(int(m.group(1)) for s in suites for m in [re.search(r'\bfailures="(\d+)"', s)] if m)
+total    = sum(int(m.group(1))   for s in suites for m in [re.search(r'\btests="(\d+)"',    s)] if m)
+failures = sum(int(m.group(1))   for s in suites for m in [re.search(r'\bfailures="(\d+)"', s)] if m)
+time     = sum(float(m.group(1)) for s in suites for m in [re.search(r'\btime="([\d.]+)"',  s)] if m)
 
 with open('junit-combined.xml', 'w') as f:
     f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-    f.write(f'<testsuites tests="{total}" failures="{failures}">\n')
+    f.write(f'<testsuites tests="{total}" failures="{failures}" time="{round(time, 3)}">\n')
     for s in suites:
         f.write(s + '\n')
     f.write('</testsuites>\n')
