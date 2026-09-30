@@ -192,7 +192,9 @@ hurl:
 
 k6:
   stage: test
-  image: grafana/k6:latest
+  image:
+    name: grafana/k6:latest
+    entrypoint: [""]
   rules:
     - changes:
         - k6-tests/**/*
