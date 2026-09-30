@@ -1,0 +1,203 @@
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.12'
+  SKIP_FAILED_TESTS: 'true'
+
+stages:
+  - stage: Test
+    displayName: 'Test'
+    jobs:
+
+      - job: jest
+        displayName: 'Jest'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '$(NODE_VERSION)'
+            displayName: 'Node.js kur'
+          - script: |
+              cd jest-tests && npm ci
+              if [ "$(SKIP_FAILED_TESTS)" = "true" ]; then
+                npm test -- --testNamePattern="^(?!.*@failed-tests)"
+              else
+                npm test
+              fi
+            displayName: 'Jest testleri calistir'
+            env:
+              JEST_JUNIT_OUTPUT_DIR: ./reports
+              JEST_JUNIT_OUTPUT_NAME: junit.xml
+              JEST_JUNIT_SUITE_NAME: '{filepath}'
+              JEST_JUNIT_CLASSNAME: '{classname}'
+              JEST_JUNIT_TITLE: '{title}'
+          - task: PublishTestResults@2
+            condition: always()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'jest-tests/reports/junit.xml'
+              testRunTitle: 'Jest'
+          - publish: jest-tests/reports/junit.xml
+            artifact: jest-junit
+            condition: always()
+            displayName: 'Artifact yukle'
+
+      - job: vitest
+        displayName: 'Vitest'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '$(NODE_VERSION)'
+            displayName: 'Node.js kur'
+          - script: |
+              cd vitest-tests && npm ci
+              if [ "$(SKIP_FAILED_TESTS)" = "true" ]; then
+                npx vitest run --reporter=junit --outputFile=reports/junit.xml -t "^((?!@failed-tests).)*$"
+              else
+                npm test
+              fi
+            displayName: 'Vitest testleri calistir'
+          - task: PublishTestResults@2
+            condition: always()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'vitest-tests/reports/junit.xml'
+              testRunTitle: 'Vitest'
+          - publish: vitest-tests/reports/junit.xml
+            artifact: vitest-junit
+            condition: always()
+            displayName: 'Artifact yukle'
+
+      - job: mocha
+        displayName: 'Mocha'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '$(NODE_VERSION)'
+            displayName: 'Node.js kur'
+          - script: |
+              cd mocha-tests && npm ci
+              if [ "$(SKIP_FAILED_TESTS)" = "true" ]; then
+                npx mocha 'test/**/*.test.js' --reporter mocha-junit-reporter --reporter-options mochaFile=reports/junit.xml --fgrep "@failed-tests" --invert
+              else
+                npm test
+              fi
+            displayName: 'Mocha testleri calistir'
+          - task: PublishTestResults@2
+            condition: always()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'mocha-tests/reports/junit.xml'
+              testRunTitle: 'Mocha'
+          - publish: mocha-tests/reports/junit.xml
+            artifact: mocha-junit
+            condition: always()
+            displayName: 'Artifact yukle'
+
+      - job: pytest
+        displayName: 'Pytest'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(PYTHON_VERSION)'
+            displayName: 'Python kur'
+          - script: |
+              cd pytest-tests && pip install -r requirements.txt
+              if [ "$(SKIP_FAILED_TESTS)" = "true" ]; then
+                pytest tests/ --junitxml=reports/junit.xml -v --tb=short -k "not failed_tests"
+              else
+                pytest tests/ --junitxml=reports/junit.xml -v --tb=short
+              fi
+            displayName: 'Pytest testleri calistir'
+          - task: PublishTestResults@2
+            condition: always()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'pytest-tests/reports/junit.xml'
+              testRunTitle: 'Pytest'
+          - publish: pytest-tests/reports/junit.xml
+            artifact: pytest-junit
+            condition: always()
+            displayName: 'Artifact yukle'
+
+      - job: cypress
+        displayName: 'Cypress'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '$(NODE_VERSION)'
+            displayName: 'Node.js kur'
+          - script: cd cypress-tests && npm ci && npm test
+            displayName: 'Cypress testleri calistir'
+          - task: PublishTestResults@2
+            condition: always()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'cypress-tests/reports/junit.xml'
+              testRunTitle: 'Cypress'
+          - publish: cypress-tests/reports/junit.xml
+            artifact: cypress-junit
+            condition: always()
+            displayName: 'Artifact yukle'
+
+  - stage: Merge
+    displayName: 'Raporlari Birlestir'
+    dependsOn: Test
+    condition: always()
+    jobs:
+      - job: merge_reports
+        displayName: 'merge-reports'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - download: current
+            artifact: jest-junit
+            continueOnError: true
+          - download: current
+            artifact: vitest-junit
+            continueOnError: true
+          - download: current
+            artifact: mocha-junit
+            continueOnError: true
+          - download: current
+            artifact: pytest-junit
+            continueOnError: true
+          - download: current
+            artifact: cypress-junit
+            continueOnError: true
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(PYTHON_VERSION)'
+            displayName: 'Python kur'
+          - script: |
+              mkdir -p jest-tests/reports vitest-tests/reports mocha-tests/reports pytest-tests/reports cypress-tests/reports
+              cp $(Pipeline.Workspace)/jest-junit/junit.xml    jest-tests/reports/junit.xml    2>/dev/null || true
+              cp $(Pipeline.Workspace)/vitest-junit/junit.xml  vitest-tests/reports/junit.xml  2>/dev/null || true
+              cp $(Pipeline.Workspace)/mocha-junit/junit.xml   mocha-tests/reports/junit.xml   2>/dev/null || true
+              cp $(Pipeline.Workspace)/pytest-junit/junit.xml  pytest-tests/reports/junit.xml  2>/dev/null || true
+              cp $(Pipeline.Workspace)/cypress-junit/junit.xml cypress-tests/reports/junit.xml 2>/dev/null || true
+              python3 merge.py
+            displayName: 'XML raporlari birlestir'
+          - task: PublishTestResults@2
+            condition: always()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'junit-combined.xml'
+              testRunTitle: 'Tum Testler'
+          - publish: junit-combined.xml
+            artifact: junit-combined
+            condition: always()
+            displayName: 'Birlesik raporu yukle'
